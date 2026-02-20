@@ -1,0 +1,122 @@
+<!-- Auto-generated from skills/cosmosdb-best-practices/rules/monitoring-*.md -->
+<!-- Regenerate: run .cursor/prompts/generate-rules.md -->
+---
+description: "Azure Cosmos DB monitoring and diagnostics: RU consumption, latency, throttling, diagnostic logs, and Azure Monitor"
+globs:
+  - "**/*.{cs,ts,js,py,java,json}"
+alwaysApply: false
+---
+
+# Monitoring & Diagnostics
+
+Proactive monitoring catches issues before they impact users. Diagnostics enable root cause analysis.
+
+## Track RU consumption
+
+Monitor `x-ms-request-charge` on every response to understand cost per operation.
+
+```csharp
+// ✅ Good - track RU on every operation
+var response = await container.ReadItemAsync<Order>(id, pk);
+_logger.LogDebug("Read consumed {RU} RU", response.RequestCharge);
+
+// Alert on expensive operations
+if (response.RequestCharge > 50)
+    _logger.LogWarning("High RU operation: {RU} RU for {Op}", response.RequestCharge, "ReadItem");
+
+// Track query RU
+var iterator = container.GetItemQueryIterator<Order>(query);
+double totalRU = 0;
+while (iterator.HasMoreResults)
+{
+    var page = await iterator.ReadNextAsync();
+    totalRU += page.RequestCharge;
+}
+_logger.LogInformation("Query total: {RU} RU, {Count} items", totalRU, count);
+```
+
+## Monitor P99 latency
+
+Track client-side latency percentiles. Investigate when P99 exceeds your SLA.
+
+```csharp
+// Capture latency per operation
+var sw = Stopwatch.StartNew();
+var response = await container.ReadItemAsync<Order>(id, pk);
+sw.Stop();
+
+if (sw.ElapsedMilliseconds > 100)
+{
+    _logger.LogWarning(
+        "Slow operation: {Ms}ms, RU: {RU}, Diagnostics: {Diag}",
+        sw.ElapsedMilliseconds, response.RequestCharge,
+        response.Diagnostics.ToString());
+}
+
+// Use Application Insights or similar to aggregate percentiles
+// Alert when P99 > 100ms for point reads
+// Alert when P99 > 500ms for queries
+```
+
+## Alert on throttling (429s)
+
+Set up alerts for HTTP 429 responses. Sustained throttling indicates insufficient throughput.
+
+```csharp
+// SDK handles retries automatically, but log throttling events
+catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.TooManyRequests)
+{
+    _logger.LogWarning(
+        "Throttled: RetryAfter={RetryAfter}, RU={RU}",
+        ex.RetryAfter, ex.RequestCharge);
+    // Consider: scale up throughput, enable autoscale, or optimize queries
+}
+```
+
+Azure Monitor alerts:
+- **Metric**: Total Requests where StatusCode = 429
+- **Threshold**: > 10 per 5 minutes
+- **Action**: Notify team to investigate throughput
+
+## Enable diagnostic logging
+
+Enable Cosmos DB diagnostic settings to send logs to Log Analytics, Storage, or Event Hubs.
+
+```bash
+# Enable diagnostic settings via CLI
+az monitor diagnostic-settings create \
+    --name "cosmos-diagnostics" \
+    --resource "/subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.DocumentDB/databaseAccounts/{account}" \
+    --workspace "/subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.OperationalInsights/workspaces/{workspace}" \
+    --logs '[{"category": "DataPlaneRequests", "enabled": true}, {"category": "QueryRuntimeStatistics", "enabled": true}]'
+```
+
+Key diagnostic categories:
+- **DataPlaneRequests**: All CRUD operations with RU, latency, status
+- **QueryRuntimeStatistics**: Query execution details, index usage
+- **PartitionKeyStatistics**: Partition key distribution and hot partitions
+- **ControlPlaneRequests**: Configuration changes
+
+## Integrate Azure Monitor
+
+Use Azure Monitor workbooks and alerts for production observability.
+
+Key metrics to monitor:
+- **Normalized RU Consumption** (by PartitionKeyRangeId) — hot partition detection
+- **Total Requests** (by StatusCode) — error rates, throttling
+- **Server Side Latency** (P50, P99) — backend performance
+- **Available Storage** — capacity planning
+- **Metadata Requests** — excessive routing refreshes
+
+```kusto
+// Log Analytics: Find slow operations
+AzureDiagnostics
+| where ResourceProvider == "MICROSOFT.DOCUMENTDB"
+| where Category == "DataPlaneRequests"
+| where duration_s > 100
+| project TimeGenerated, operationType_s, requestCharge_s, duration_s, statusCode_s
+| order by duration_s desc
+| take 50
+```
+
+Reference: [Monitor Cosmos DB](https://learn.microsoft.com/azure/cosmos-db/monitor) | [Diagnostic logs](https://learn.microsoft.com/azure/cosmos-db/monitor-resource-logs)

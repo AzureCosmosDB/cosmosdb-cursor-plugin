@@ -1,0 +1,214 @@
+<!-- Auto-generated from skills/cosmosdb-best-practices/rules/model-*.md -->
+<!-- Regenerate: run .cursor/prompts/generate-rules.md -->
+---
+description: "Azure Cosmos DB data modeling rules: document design, embedding, referencing, size limits, and schema evolution"
+globs:
+  - "**/*.{cs,ts,js,py,java,json}"
+alwaysApply: false
+---
+
+# Data Modeling
+
+Proper data modeling is foundational to Cosmos DB performance. Poor modeling leads to expensive queries, excessive RU consumption, and scalability issues that are difficult to fix later.
+
+## Embed related data retrieved together
+
+Embed related data within a single document when they are always accessed together. This eliminates the need for multiple queries (Cosmos DB has no JOINs across documents).
+
+```csharp
+// ❌ Bad - separate documents require multiple round-trips
+var order = await container.ReadItemAsync<Order>(orderId, pk);
+var customer = await container.ReadItemAsync<Customer>(order.CustomerId, pk2);
+var items = await container.GetItemQueryIterator<OrderItem>(
+    $"SELECT * FROM c WHERE c.orderId = '{orderId}'").ReadNextAsync();
+// 3 separate queries = 3x latency + 3x RU cost
+
+// ✅ Good - single read gets everything
+public class Order
+{
+    public string Id { get; set; }
+    public string CustomerId { get; set; }
+    public CustomerSummary Customer { get; set; }  // Embedded summary
+    public List<OrderItem> Items { get; set; }     // Embedded items
+    public decimal Total { get; set; }
+}
+
+var order = await container.ReadItemAsync<Order>(orderId, pk);
+// 1 query = lowest latency + minimal RU
+```
+
+Embed when:
+- Data is read together frequently
+- Embedded data changes infrequently
+- Embedded data is bounded in size
+
+## Reference data when items grow large
+
+Use document references instead of embedding when embedded data would make items too large or changes independently.
+
+```csharp
+// ❌ Bad - embedded array grows unbounded
+public class BlogPost
+{
+    public string Id { get; set; }
+    public string Title { get; set; }
+    public List<Comment> Comments { get; set; }  // Could be thousands → hits 2MB
+}
+
+// ✅ Good - separate comment documents in same partition
+public class BlogPost
+{
+    public string Id { get; set; }
+    public string PostId { get; set; }  // Partition key
+    public string Type { get; set; } = "post";
+    public int CommentCount { get; set; }  // Denormalized count
+}
+
+public class Comment
+{
+    public string Id { get; set; }
+    public string PostId { get; set; }  // Same partition key
+    public string Type { get; set; } = "comment";
+    public string Text { get; set; }
+}
+```
+
+## Denormalize for read-heavy workloads
+
+Accept write overhead for faster reads when the read-to-write ratio is high (10:1 or more).
+
+```csharp
+// ❌ Bad - N+1 query problem
+foreach (var product in products)
+{
+    var category = await container.ReadItemAsync<Category>(
+        product.CategoryId, new PartitionKey(product.CategoryId));
+    product.CategoryName = category.Name;
+}
+
+// ✅ Good - denormalized, single query
+public class Product
+{
+    public string Id { get; set; }
+    public string CategoryId { get; set; }
+    public string CategoryName { get; set; }  // Denormalized
+    public string CategorySlug { get; set; }  // Denormalized
+    public decimal Price { get; set; }
+}
+```
+
+## Use type discriminators for polymorphic data
+
+Include a `type` discriminator field when storing multiple entity types in the same container.
+
+```csharp
+// ❌ Bad - no type discrimination
+var allItems = await container.GetItemQueryIterator<dynamic>(
+    "SELECT * FROM c").ReadNextAsync();
+var orders = allItems.Where(x => x.orderDate != null);  // Brittle
+
+// ✅ Good - explicit type field
+public abstract class BaseEntity
+{
+    public string Id { get; set; }
+    public abstract string Type { get; }
+}
+
+public class Order : BaseEntity
+{
+    public override string Type => "order";
+}
+
+// Efficient filtered query using index
+var query = "SELECT * FROM c WHERE c.type = 'order'";
+```
+
+## Keep items well under 2MB limit
+
+Azure Cosmos DB enforces a **2MB maximum item size**. Store large content in Blob Storage and keep only metadata/references in Cosmos DB.
+
+```csharp
+// ❌ Bad - large binary data in document
+public string FileContent { get; set; }  // Could be megabytes
+
+// ✅ Good - reference to blob
+public string BlobUri { get; set; }
+public long FileSizeBytes { get; set; }
+
+// Monitor size before writing
+var sizeBytes = Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(item));
+if (sizeBytes > 1_500_000)  // 1.5MB warning threshold
+    _logger.LogWarning("Item approaching size limit: {SizeKB}KB", sizeBytes / 1024);
+```
+
+## Follow ID value constraints
+
+- **Max length:** 1,023 bytes
+- **Forbidden characters:** `/` and `\`
+- **Best practice:** Use only alphanumeric ASCII characters (`a-z`, `A-Z`, `0-9`, `-`, `_`)
+
+```csharp
+// ❌ Bad
+var id = "files/reports\\2026/Q1";  // Contains / and \
+
+// ✅ Good
+var id = Guid.NewGuid().ToString();
+var id = $"report-{tenantId}-{DateTime.UtcNow:yyyyMMdd}-{seq}";
+```
+
+## Version your document schemas
+
+Include a `schemaVersion` field to handle evolution gracefully.
+
+```csharp
+// ✅ Good - versioned documents
+public class User
+{
+    public string Id { get; set; }
+    public int SchemaVersion { get; set; } = 2;
+    public string FirstName { get; set; }
+    public string LastName { get; set; }
+}
+
+// Read with version handling
+var version = doc.GetProperty("schemaVersion").GetInt32();
+return version switch
+{
+    1 => MigrateV1ToV2(JsonSerializer.Deserialize<UserV1>(doc)),
+    2 => JsonSerializer.Deserialize<UserV2>(doc),
+    _ => throw new NotSupportedException($"Unknown version: {version}")
+};
+```
+
+## Stay within 128-level nesting depth
+
+Prefer flat representations with references (parent IDs, materialized paths) for deep hierarchies.
+
+```csharp
+// ❌ Bad - recursive nesting can exceed 128
+public class TreeNode { public List<TreeNode> Children { get; set; } }
+
+// ✅ Good - flat with materialized path
+public class CategoryNode
+{
+    public string Id { get; set; }
+    public string ParentId { get; set; }
+    public string Path { get; set; }  // "/root/electronics/phones/android"
+    public int Depth { get; set; }
+}
+```
+
+## Understand IEEE 754 numeric precision
+
+Numbers use double-precision 64-bit format. Integers > 2^53 and decimals >15 significant digits lose precision silently.
+
+```csharp
+// ❌ Bad - large integers lose precision
+public long ExternalTransactionId { get; set; }  // > 2^53 = silent data loss
+
+// ✅ Good - store as string or integer minor units
+public string ExternalTransactionId { get; set; }  // "9007199254740993"
+public long AmountInCents { get; set; }  // $199.99 → 19999
+```
+
+Reference: [Data modeling in Azure Cosmos DB](https://learn.microsoft.com/azure/cosmos-db/nosql/modeling-data) | [Service quotas](https://learn.microsoft.com/azure/cosmos-db/concepts-limits)

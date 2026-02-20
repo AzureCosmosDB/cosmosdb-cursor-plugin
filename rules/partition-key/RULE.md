@@ -1,0 +1,149 @@
+<!-- Auto-generated from skills/cosmosdb-best-practices/rules/partition-*.md -->
+<!-- Regenerate: run .cursor/prompts/generate-rules.md -->
+---
+description: "Azure Cosmos DB partition key design: cardinality, hot partitions, hierarchical keys, and query alignment"
+globs:
+  - "**/*.{cs,ts,js,py,java,json}"
+alwaysApply: false
+---
+
+# Partition Key Design
+
+Partition key choice determines data distribution, query efficiency, and scalability limits. A bad partition key creates hot partitions and cross-partition query overhead.
+
+## Choose high-cardinality partition keys
+
+Select partition keys with many unique values (thousands to millions) to ensure even data distribution.
+
+```csharp
+// ❌ Bad - low cardinality creates hotspots
+public string Status { get; set; }   // Only 5-10 values: "pending", "shipped"…
+public string Country { get; set; }  // ~195 countries, uneven distribution
+
+// ✅ Good - high cardinality, even distribution
+public string CustomerId { get; set; }  // Millions of unique customers
+public string TenantId { get; set; }    // Natural isolation per tenant
+public string DeviceId { get; set; }    // Thousands/millions of devices
+```
+
+## Align partition key with query patterns
+
+Choose a partition key that supports your most frequent queries. Single-partition queries are orders of magnitude faster than cross-partition.
+
+```csharp
+// Step 1: Analyze your query patterns
+// - 80% of queries: "Get all products for seller X"
+// - 15% of queries: "Get product by ID"
+// - 5% of queries: "Get products by category"
+
+// Step 2: Choose partition key for dominant pattern
+public class Product
+{
+    public string Id { get; set; }
+    public string SellerId { get; set; }  // ✅ Partition key - matches 80% queries
+    public string Category { get; set; }  // Regular property
+}
+
+// Most common query is now single-partition → fast, low RU
+var query = new QueryDefinition("SELECT * FROM c WHERE c.sellerId = @seller")
+    .WithParameter("@seller", sellerId);
+```
+
+## Distribute writes to avoid hot partitions
+
+Ensure writes distribute evenly. A hot partition limits throughput to that single partition's capacity (~10K RU/s).
+
+```csharp
+// ❌ Bad - all writes hit today's partition
+public string Date { get; set; }  // "2026-01-21" - HOT!
+
+// ❌ Bad - singleton partition
+public string PartitionKey { get; set; } = "config";  // ONE partition!
+
+// ✅ Good - write-sharding for time-series data
+public static string CreateTimeShardedKey(DateTime timestamp, int shardCount = 10)
+{
+    var dateKey = timestamp.ToString("yyyy-MM-dd");
+    var shard = Math.Abs(Guid.NewGuid().GetHashCode()) % shardCount;
+    return $"{dateKey}_shard{shard}";
+}
+```
+
+Monitor for hot partitions: check Metrics → Normalized RU Consumption. Alert on partitions consistently at 100%.
+
+## Plan for 20GB logical partition limit
+
+Each logical partition has a **20GB storage limit**. Design keys so no single partition value accumulates more than 20GB.
+
+```csharp
+// ❌ Bad - unbounded partition growth
+public string SystemId { get; set; }  // Only 3 systems, logs forever
+
+// ✅ Good - time-bucket the partition key
+public string PartitionKey => $"{SystemId}_{Timestamp:yyyy-MM}";
+// Each partition holds ~1 month, old partitions stop growing
+```
+
+Target < 10GB per partition value (50% safety margin).
+
+## Use hierarchical partition keys for flexibility
+
+Use hierarchical partition keys (HPK) to overcome the 20GB limit and enable targeted multi-partition queries.
+
+```csharp
+// Create container with hierarchical partition key
+var containerProperties = new ContainerProperties
+{
+    Id = "documents",
+    PartitionKeyPaths = new List<string>
+    {
+        "/tenantId",   // Level 1: Tenant
+        "/year",       // Level 2: Year
+        "/month"       // Level 3: Month
+    }
+};
+
+// Full key: single partition point read
+var doc = await container.ReadItemAsync<Document>(
+    docId,
+    new PartitionKeyBuilder()
+        .Add("acme-corp")
+        .Add(2026)
+        .Add(1)
+        .Build());
+
+// Level 1 only: scans all partitions for tenant
+// Level 1+2: targets specific year partitions
+```
+
+## Create synthetic partition keys when needed
+
+When no single natural field serves as an ideal partition key, combine multiple fields.
+
+```csharp
+// ✅ Good - synthetic key for IoT data
+public class Telemetry
+{
+    public string DeviceId { get; set; }
+    public DateTime Timestamp { get; set; }
+    public string PartitionKey => $"{DeviceId}_{Timestamp:yyyy-MM}";
+}
+// Creates: "device123_2026-01", "device123_2026-02"
+// No partition grows indefinitely
+```
+
+## Respect partition key value length limits
+
+- Default limit: **101 bytes** (without large partition key feature)
+- With large partition keys: **2,048 bytes**
+- Prefer short GUIDs/IDs over human-readable strings
+
+```csharp
+// ❌ Bad - concatenating long descriptions
+public string PartitionKey => $"{TenantName}_{DepartmentName}_{ProjectDescription}";
+
+// ✅ Good - compact identifiers
+public string PartitionKey => $"{TenantId}_{DepartmentId}";  // e.g., "t-abc123_dept-42"
+```
+
+Reference: [Partitioning overview](https://learn.microsoft.com/azure/cosmos-db/partitioning-overview) | [Hierarchical partition keys](https://learn.microsoft.com/azure/cosmos-db/hierarchical-partition-keys)

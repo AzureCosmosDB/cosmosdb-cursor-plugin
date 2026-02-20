@@ -5,9 +5,8 @@ The Azure Cosmos DB plugin for [Cursor](https://cursor.com/) gives Cursor the to
 ## What's Included
 
 - **MCP Server** — Connection to the [Azure Cosmos DB MCP Toolkit](https://github.com/AzureCosmosDB/MCPToolKit) for database operations, queries, vector search, and schema discovery
-- **Skills** — 45+ best-practice rules from the [cosmosdb-agent-kit](https://github.com/AzureCosmosDB/cosmosdb-agent-kit), covering data modeling, partition key design, query optimization, SDK usage, indexing, throughput, global distribution, monitoring, and vector search
-- **Rules** — Coding rules for Cosmos DB SDK patterns and data modeling conventions
-- **CI Sync** — GitHub Actions workflow that syncs skills weekly from the upstream agent-kit repo
+- **Rules** — 10 categorized rule sets (Supabase-style `my-rule/RULE.md` format) covering data modeling, partition key design, query optimization, SDK patterns, indexing, throughput, global distribution, monitoring, design patterns, and vector search — sourced from the [cosmosdb-agent-kit](https://github.com/AzureCosmosDB/cosmosdb-agent-kit)
+- **Saved Prompt** — A regeneration prompt (`.cursor/prompts/generate-rules.md`) to update rules when the upstream agent-kit changes
 
 ## MCP Tools Available
 
@@ -87,33 +86,38 @@ List all databases in my Cosmos DB account
 
 ```
 cosmosdb-cursor-plugin/
+├── .cursor/
+│   └── prompts/
+│       └── generate-rules.md   # Saved prompt to regenerate rules
 ├── .cursor-plugin/
-│   └── plugin.json          # Plugin manifest
-├── .github/
-│   └── workflows/
-│       └── sync-agent-kit.yml  # Weekly CI sync from upstream
-├── .mcp.json                # MCP server configuration
+│   └── plugin.json             # Plugin manifest
+├── .mcp.json                   # MCP server configuration
 ├── assets/
-│   └── logo.svg             # Plugin logo
+│   └── logo.svg                # Plugin logo
 ├── rules/
-│   ├── cosmosdb-sdk-patterns.mdc
-│   └── cosmosdb-data-modeling.mdc
-├── skills/
-│   └── cosmosdb-best-practices/  # Synced from cosmosdb-agent-kit
-│       ├── SKILL.md
-│       ├── AGENTS.md
-│       ├── metadata.json
-│       └── rules/           # 70+ individual rule files
+│   ├── RULE.md                 # Index rule (points to sub-rules)
+│   ├── data-modeling/RULE.md
+│   ├── design-patterns/RULE.md
+│   ├── global-distribution/RULE.md
+│   ├── indexing/RULE.md
+│   ├── monitoring/RULE.md
+│   ├── partition-key/RULE.md
+│   ├── query-optimization/RULE.md
+│   ├── sdk-patterns/RULE.md
+│   ├── throughput/RULE.md
+│   └── vector-search/RULE.md
 ├── LICENSE
 └── README.md
 ```
 
-## Keeping Skills Up to Date
+## Keeping Rules Up to Date
 
-Skills are sourced from [`AzureCosmosDB/cosmosdb-agent-kit`](https://github.com/AzureCosmosDB/cosmosdb-agent-kit) and kept in sync via a GitHub Actions workflow (`.github/workflows/sync-agent-kit.yml`).
+Rules are derived from the [`AzureCosmosDB/cosmosdb-agent-kit`](https://github.com/AzureCosmosDB/cosmosdb-agent-kit) skills.
 
-- **Automatic**: Runs weekly (Monday 09:00 UTC) and opens a PR if changes are detected.
-- **Manual**: Trigger the `Sync skills from cosmosdb-agent-kit` workflow from the Actions tab.
+To regenerate rules after the upstream agent-kit updates:
+
+1. Open `.cursor/prompts/generate-rules.md` in Cursor
+2. Run the saved prompt — it fetches the latest skills from the agent-kit repo and regenerates all `rules/*/RULE.md` files
 
 ## Usage Examples
 
@@ -125,7 +129,7 @@ Skills are sourced from [`AzureCosmosDB/cosmosdb-agent-kit`](https://github.com/
 - "Search for documents where the name contains 'Azure'"
 - "Find the document with id 'user-001' in the `users` container"
 
-### With Skills (no setup needed)
+### With Rules (no setup needed)
 
 - "Review my Cosmos DB data model for this application"
 - "What partition key should I use for a multi-tenant SaaS app?"
