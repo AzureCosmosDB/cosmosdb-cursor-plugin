@@ -5,10 +5,9 @@ The Azure Cosmos DB plugin for [Cursor](https://cursor.com/) gives Cursor the to
 ## What's Included
 
 - **MCP Server** — Connection to the [Azure Cosmos DB MCP Toolkit](https://github.com/AzureCosmosDB/MCPToolKit) for database operations, queries, vector search, and schema discovery
-- **Skills** — Agent skills for Cosmos DB best practices:
-  - `cosmosdb-nosql-best-practices` — Query optimization, SDK usage, indexing, throughput management
-  - `cosmosdb-data-modeling` — Embedding vs. referencing, multi-tenant patterns, container design
+- **Skills** — 45+ best-practice rules from the [cosmosdb-agent-kit](https://github.com/AzureCosmosDB/cosmosdb-agent-kit), covering data modeling, partition key design, query optimization, SDK usage, indexing, throughput, global distribution, monitoring, and vector search
 - **Rules** — Coding rules for Cosmos DB SDK patterns and data modeling conventions
+- **CI Sync** — GitHub Actions workflow that syncs skills weekly from the upstream agent-kit repo
 
 ## MCP Tools Available
 
@@ -90,6 +89,9 @@ List all databases in my Cosmos DB account
 cosmosdb-cursor-plugin/
 ├── .cursor-plugin/
 │   └── plugin.json          # Plugin manifest
+├── .github/
+│   └── workflows/
+│       └── sync-agent-kit.yml  # Weekly CI sync from upstream
 ├── .mcp.json                # MCP server configuration
 ├── assets/
 │   └── logo.svg             # Plugin logo
@@ -97,13 +99,21 @@ cosmosdb-cursor-plugin/
 │   ├── cosmosdb-sdk-patterns.mdc
 │   └── cosmosdb-data-modeling.mdc
 ├── skills/
-│   ├── cosmosdb-nosql-best-practices/
-│   │   └── SKILL.md
-│   └── cosmosdb-data-modeling/
-│       └── SKILL.md
+│   └── cosmosdb-best-practices/  # Synced from cosmosdb-agent-kit
+│       ├── SKILL.md
+│       ├── AGENTS.md
+│       ├── metadata.json
+│       └── rules/           # 70+ individual rule files
 ├── LICENSE
 └── README.md
 ```
+
+## Keeping Skills Up to Date
+
+Skills are sourced from [`AzureCosmosDB/cosmosdb-agent-kit`](https://github.com/AzureCosmosDB/cosmosdb-agent-kit) and kept in sync via a GitHub Actions workflow (`.github/workflows/sync-agent-kit.yml`).
+
+- **Automatic**: Runs weekly (Monday 09:00 UTC) and opens a PR if changes are detected.
+- **Manual**: Trigger the `Sync skills from cosmosdb-agent-kit` workflow from the Actions tab.
 
 ## Usage Examples
 
