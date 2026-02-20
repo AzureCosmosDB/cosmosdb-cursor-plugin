@@ -1,0 +1,22 @@
+{
+  "name": "azure-cosmosdb",
+  "version": "0.1.0",
+  "description": "Access your Azure Cosmos DB accounts and perform tasks like managing databases, querying data, vector search, and schema discovery.",
+  "author": {
+    "name": "Azure Cosmos DB",
+    "url": "https://azure.microsoft.com/products/cosmos-db"
+  },
+  "homepage": "https://github.com/AzureCosmosDB/MCPToolKit",
+  "repository": "https://github.com/AzureCosmosDB/cosmosdb-cursor-plugin",
+  "license": "MIT",
+  "keywords": [
+    "azure",
+    "cosmos-db",
+    "cosmosdb",
+    "nosql",
+    "database",
+    "vector-search",
+    "mcp"
+  ],
+  "logo": "assets/logo.svg"
+}

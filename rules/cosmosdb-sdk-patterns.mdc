@@ -1,0 +1,33 @@
+---
+description: Apply Azure Cosmos DB SDK best practices when writing code that interacts with Cosmos DB. Covers connection management, error handling, and performance patterns.
+alwaysApply: false
+globs: "**/*.{cs,ts,js,py,java}"
+---
+
+# Azure Cosmos DB SDK Rules
+
+## Connection Management
+- **Always use a singleton `CosmosClient`** — never create a new client per request.
+- Use **Direct connection mode** for lowest latency (default in .NET SDK v3+).
+- Configure **preferred regions** closest to your application for multi-region accounts.
+
+## Error Handling
+- Always handle **HTTP 429 (TooManyRequests)** with retry logic using the `RetryAfter` header.
+- The SDK has built-in retry logic; configure `MaxRetryAttemptsOnRateLimitedRequests` and `MaxRetryWaitTimeOnRateLimitedRequests`.
+- Log **diagnostics** when latency exceeds thresholds or unexpected status codes are returned.
+
+## Query Patterns
+- **Always include the partition key** in queries to avoid cross-partition fan-out.
+- Use **point reads** (`ReadItemAsync`) instead of queries when you have both `id` and partition key.
+- **Project only needed fields** with `SELECT c.field1, c.field2` instead of `SELECT *`.
+- Use **pagination with continuation tokens** for large result sets.
+
+## Write Patterns
+- Enable **bulk execution** (`AllowBulkExecution = true`) for batch ingestion scenarios.
+- Use `Task.WhenAll` with bulk mode for concurrent writes.
+- Prefer **upsert** (`UpsertItemAsync`) over read-then-write patterns to avoid race conditions.
+
+## Performance
+- Check `x-ms-request-charge` on every response to monitor RU consumption.
+- Use **stream APIs** when you don't need deserialization for lower memory/CPU.
+- Set `MaxItemCount` appropriately for query pagination.

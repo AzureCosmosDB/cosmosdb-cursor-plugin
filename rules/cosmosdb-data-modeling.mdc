@@ -1,0 +1,33 @@
+---
+description: Enforce Azure Cosmos DB data modeling conventions. Apply when designing schemas, defining containers, or writing Cosmos DB item structures.
+alwaysApply: false
+globs: "**/*.{json,cs,ts,js,py}"
+---
+
+# Azure Cosmos DB Data Modeling Rules
+
+## Document Design
+- **Include a `type` discriminator field** in every document when storing multiple entity types in the same container.
+- **Keep documents well under 2 MB** — the maximum item size limit in Azure Cosmos DB.
+- **Embed related data** when it is always read together and is bounded in size.
+- **Reference with separate documents** when related data is unbounded, frequently updated independently, or rarely accessed together.
+
+## Partition Key
+- **Always define a partition key** with high cardinality (many unique values).
+- **Never use low-cardinality fields** like `status`, `country`, or `boolean` as partition keys.
+- **Never use timestamps** as partition keys — they create append-only hot partitions.
+- **Use hierarchical partition keys** when a single logical partition could exceed 20 GB.
+
+## Container Design
+- **Prefer fewer containers** with a type discriminator over many small containers.
+- **Store related entities in the same container** and partition to enable single-partition queries.
+
+## Indexing
+- **Customize the indexing policy** — exclude large payload fields never used in queries.
+- **Add composite indexes** when using `ORDER BY` on multiple properties.
+- **Add vector indexes** when using vector/similarity search.
+
+## Throughput
+- **Use autoscale** for variable or unpredictable workloads.
+- **Use serverless** for dev/test or low-traffic scenarios.
+- **Set TTL** on documents that have a natural expiration to avoid unbounded growth.
