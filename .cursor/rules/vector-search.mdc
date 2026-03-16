@@ -1,0 +1,179 @@
+---
+description: "Azure Cosmos DB vector search: feature enablement, embedding policies, vector indexes, VectorDistance queries, and repository patterns"
+globs:
+  - "**/*.{cs,ts,js,py,java}"
+alwaysApply: false
+---
+
+# Vector Search
+
+Vector search configuration enables AI-powered semantic search and RAG patterns. Proper embedding storage, indexing, and query optimization are essential for performance and accuracy.
+
+## Enable vector search feature on account
+
+Vector search must be enabled on the Cosmos DB account before creating containers with vector capabilities. Wait **15 minutes** after enabling.
+
+```bash
+# Step 1: Enable feature
+az cosmosdb update \
+    --resource-group myResourceGroup \
+    --name myCosmosAccount \
+    --capabilities EnableNoSQLVectorSearch
+
+# Step 2: Wait 15 minutes
+
+# Step 3: Verify enabled
+az cosmosdb show \
+    --resource-group myResourceGroup \
+    --name myCosmosAccount \
+    --query "capabilities[?name=='EnableNoSQLVectorSearch']"
+```
+
+SDK version requirements:
+- **.NET**: SDK 3.45.0+
+- **Python**: Latest Python SDK
+- **JavaScript**: SDK 4.1.0+
+- **Java**: Latest Java SDK v4
+
+## Define vector embedding policy
+
+Configure the embedding policy when creating containers.
+
+```csharp
+// .NET - Define embedding policy
+var embeddings = new Collection<Embedding>
+{
+    new Embedding
+    {
+        Path = "/embedding",
+        DataType = VectorDataType.Float32,
+        DistanceFunction = DistanceFunction.Cosine,
+        Dimensions = 1536  // Match your embedding model
+    }
+};
+
+var properties = new ContainerProperties("documents", "/category")
+{
+    VectorEmbeddingPolicy = new(embeddings)
+};
+```
+
+```python
+# Python
+vector_embedding_policy = {
+    "vectorEmbeddings": [
+        {
+            "path": "/embedding",
+            "dataType": "float32",
+            "distanceFunction": "cosine",
+            "dimensions": 1536
+        }
+    ]
+}
+```
+
+Distance functions:
+- **Cosine**: Best for normalized embeddings (most common)
+- **Euclidean**: When magnitude matters
+- **DotProduct**: For pre-normalized vectors
+
+## Configure vector indexes in indexing policy
+
+**CRITICAL**: Exclude vector paths from regular indexing to avoid high RU charges on inserts.
+
+```csharp
+// ✅ Good - vector index with excluded paths
+properties.IndexingPolicy = new IndexingPolicy
+{
+    VectorIndexes = new List<VectorIndexPath>
+    {
+        new VectorIndexPath
+        {
+            Path = "/embedding",
+            Type = VectorIndexType.QuantizedFlat  // or DiskANN
+        }
+    }
+};
+properties.IndexingPolicy.IncludedPaths.Add(new IncludedPath { Path = "/*" });
+properties.IndexingPolicy.ExcludedPaths.Add(new ExcludedPath { Path = "/embedding/*" });
+```
+
+Index type selection:
+- **QuantizedFlat**: < 50K vectors, faster builds, lower memory
+- **DiskANN**: > 50K vectors, better recall, production workloads
+
+## Use VectorDistance for similarity search
+
+```csharp
+// .NET
+var query = new QueryDefinition(
+    @"SELECT TOP @limit c.id, c.title, c.content,
+      VectorDistance(c.embedding, @queryVector) AS score
+      FROM c
+      ORDER BY VectorDistance(c.embedding, @queryVector)")
+    .WithParameter("@queryVector", queryEmbedding)
+    .WithParameter("@limit", 10);
+
+var results = container.GetItemQueryIterator<SearchResult>(query);
+```
+
+```python
+# Python
+query = """
+    SELECT TOP @limit c.id, c.title, c.content,
+           VectorDistance(c.embedding, @queryVector) AS score
+    FROM c
+    ORDER BY VectorDistance(c.embedding, @queryVector)
+"""
+items = list(container.query_items(
+    query=query,
+    parameters=[
+        {"name": "@queryVector", "value": query_embedding},
+        {"name": "@limit", "value": 10}
+    ],
+    enable_cross_partition_query=True
+))
+```
+
+## Normalize embeddings for cosine similarity
+
+When using cosine distance, normalize embeddings to unit length (L2 norm = 1).
+
+```python
+# ✅ Good - normalized to unit length
+import numpy as np
+
+def generate_mock_embedding(text: str, dimensions: int = 1536) -> list:
+    seed = hash(text) % (2**32)
+    np.random.seed(seed)
+    vector = np.random.randn(dimensions).astype(np.float32)
+    vector = vector / np.linalg.norm(vector)  # Normalize
+    return vector.tolist()
+
+# Verify
+assert abs(np.linalg.norm(embedding) - 1.0) < 1e-6
+```
+
+## Implement repository pattern for vector search
+
+Encapsulate Cosmos DB vector operations in a repository for testability and maintainability.
+
+```csharp
+public interface IDocumentRepository
+{
+    Task<DocumentChunk> InsertDocumentAsync(DocumentChunk document);
+    Task<List<DocumentChunk>> VectorSearchAsync(
+        float[] queryEmbedding, int limit = 5,
+        double similarityThreshold = 0.0, string? categoryFilter = null);
+    Task<DocumentChunk?> GetDocumentAsync(string id, string category);
+}
+
+// Key implementation patterns:
+// - Use upsert for idempotent inserts
+// - Always parameterize queries (never concatenate embeddings)
+// - Include ORDER BY VectorDistance() for ranked results
+// - Exclude embeddings from SELECT when not needed (performance)
+// - Log RU consumption for monitoring
+```
+
+Reference: [Vector search](https://learn.microsoft.com/azure/cosmos-db/nosql/vector-search) | [VectorDistance](https://learn.microsoft.com/azure/cosmos-db/nosql/query/vectordistance)

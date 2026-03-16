@@ -1,5 +1,3 @@
-<!-- Auto-generated from skills/cosmosdb-best-practices/rules/model-*.md -->
-<!-- Regenerate: run .cursor/prompts/generate-rules.md -->
 ---
 description: "Azure Cosmos DB data modeling rules: document design, embedding, referencing, size limits, and schema evolution"
 globs:

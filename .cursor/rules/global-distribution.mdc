@@ -1,0 +1,133 @@
+---
+description: "Azure Cosmos DB global distribution: multi-region, consistency levels, failover, and conflict resolution"
+globs:
+  - "**/*.{cs,ts,js,py,java,json}"
+alwaysApply: false
+---
+
+# Global Distribution
+
+Multi-region configuration enables low-latency reads globally and disaster recovery. Consistency choices impact both performance and data guarantees.
+
+## Configure multi-region writes
+
+Enable multi-region writes for active-active deployments where each region can accept writes.
+
+```csharp
+// Enable in account settings (Azure portal or CLI)
+// az cosmosdb update --enable-multiple-write-locations true
+
+// SDK configuration
+var options = new CosmosClientOptions
+{
+    ApplicationPreferredRegions = new List<string>
+    {
+        Regions.EastUS,     // Local region
+        Regions.WestEurope  // Secondary
+    }
+};
+// With multi-region writes, the SDK routes writes to the nearest region
+```
+
+Trade-offs:
+- Lower write latency (writes go to nearest region)
+- Requires conflict resolution policy
+- Higher cost (billed per region for writes)
+
+## Choose appropriate consistency level
+
+Five levels from strongest to weakest:
+
+| Level | Guarantee | Use case |
+|-------|-----------|----------|
+| **Strong** | Linearizable reads | Financial transactions |
+| **Bounded Staleness** | Reads lag by K versions or T time | Leaderboards, counts |
+| **Session** (default) | Read-your-own-writes | Most applications |
+| **Consistent Prefix** | No out-of-order reads | Social feeds |
+| **Eventual** | No ordering guarantee | Counters, likes |
+
+```csharp
+// Account-level default
+// Set in Azure portal: Account → Default Consistency
+
+// Per-request override (can only weaken, not strengthen)
+var options = new ItemRequestOptions
+{
+    ConsistencyLevel = ConsistencyLevel.Eventual  // Weaker = lower RU cost
+};
+```
+
+**Session consistency** is the best default for most applications — it guarantees you can always read what you just wrote.
+
+## Add read regions near users
+
+Add read replicas in regions closest to your users for low-latency reads.
+
+```csharp
+// Configure preferred regions in order of priority
+var options = new CosmosClientOptions
+{
+    ApplicationPreferredRegions = new List<string>
+    {
+        Regions.WestEurope,  // European users read from here
+        Regions.EastUS       // Fallback
+    }
+};
+// Reads automatically route to the closest available region
+```
+
+## Configure automatic failover
+
+Enable automatic failover so Cosmos DB redirects traffic during regional outages.
+
+```bash
+# Enable automatic failover
+az cosmosdb update \
+    --name myCosmosAccount \
+    --resource-group myRG \
+    --enable-automatic-failover true
+
+# Set failover priorities
+az cosmosdb failover-priority-change \
+    --name myCosmosAccount \
+    --resource-group myRG \
+    --failover-policies "East US=0" "West US=1" "West Europe=2"
+```
+
+## Implement conflict resolution
+
+Required for multi-region writes. Choose a strategy:
+
+- **Last Writer Wins (LWW)**: Default. Uses `_ts` or a custom path. Higher timestamp wins.
+- **Custom**: Use a stored procedure or merge procedure for complex logic.
+
+```csharp
+// Last Writer Wins with custom path
+var containerProperties = new ContainerProperties("orders", "/customerId")
+{
+    ConflictResolutionPolicy = new ConflictResolutionPolicy
+    {
+        Mode = ConflictResolutionMode.LastWriterWins,
+        ResolutionPath = "/lastModified"  // Custom timestamp field
+    }
+};
+```
+
+## Configure zone redundancy
+
+Enable availability zone redundancy for resilience within a region.
+
+```bash
+# Enable zone redundancy (only at account creation or when adding regions)
+az cosmosdb update \
+    --name myCosmosAccount \
+    --resource-group myRG \
+    --locations regionName="East US" isZoneRedundant=true failoverPriority=0
+```
+
+Zone redundancy provides:
+- Automatic replication across 3+ availability zones
+- No downtime during single-zone failures
+- No additional cost (included)
+
+Reference: [Global distribution](https://learn.microsoft.com/azure/cosmos-db/distribute-data-globally) | [Consistency levels](https://learn.microsoft.com/azure/cosmos-db/consistency-levels)

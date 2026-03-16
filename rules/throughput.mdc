@@ -1,5 +1,3 @@
-<!-- Auto-generated from skills/cosmosdb-best-practices/rules/throughput-*.md -->
-<!-- Regenerate: run .cursor/prompts/generate-rules.md -->
 ---
 description: "Azure Cosmos DB throughput and scaling: autoscale, serverless, burst capacity, and right-sizing"
 globs:

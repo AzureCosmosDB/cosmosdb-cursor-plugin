@@ -5,7 +5,7 @@ The Azure Cosmos DB plugin for [Cursor](https://cursor.com/) gives Cursor the to
 ## What's Included
 
 - **MCP Server** — Connection to the [Azure Cosmos DB MCP Toolkit](https://github.com/AzureCosmosDB/MCPToolKit) for database operations, queries, vector search, and schema discovery
-- **Rules** — 10 categorized rule sets (Supabase-style `my-rule/RULE.md` format) covering data modeling, partition key design, query optimization, SDK patterns, indexing, throughput, global distribution, monitoring, design patterns, and vector search — sourced from the [cosmosdb-agent-kit](https://github.com/AzureCosmosDB/cosmosdb-agent-kit)
+- **Rules** — 10 categorized rule sets (`.mdc` format) covering data modeling, partition key design, query optimization, SDK patterns, indexing, throughput, global distribution, monitoring, design patterns, and vector search — sourced from the [cosmosdb-agent-kit](https://github.com/AzureCosmosDB/cosmosdb-agent-kit)
 - **Saved Prompt** — A regeneration prompt (`.cursor/prompts/generate-rules.md`) to update rules when the upstream agent-kit changes
 
 ## MCP Tools Available
@@ -95,17 +95,17 @@ cosmosdb-cursor-plugin/
 ├── assets/
 │   └── logo.svg                # Plugin logo
 ├── rules/
-│   ├── RULE.md                 # Index rule (points to sub-rules)
-│   ├── data-modeling/RULE.md
-│   ├── design-patterns/RULE.md
-│   ├── global-distribution/RULE.md
-│   ├── indexing/RULE.md
-│   ├── monitoring/RULE.md
-│   ├── partition-key/RULE.md
-│   ├── query-optimization/RULE.md
-│   ├── sdk-patterns/RULE.md
-│   ├── throughput/RULE.md
-│   └── vector-search/RULE.md
+│   ├── cosmosdb-overview.mdc   # Overview rule (references all categories)
+│   ├── data-modeling.mdc
+│   ├── design-patterns.mdc
+│   ├── global-distribution.mdc
+│   ├── indexing.mdc
+│   ├── monitoring.mdc
+│   ├── partition-key.mdc
+│   ├── query-optimization.mdc
+│   ├── sdk-patterns.mdc
+│   ├── throughput.mdc
+│   └── vector-search.mdc
 ├── LICENSE
 └── README.md
 ```
@@ -117,7 +117,7 @@ Rules are derived from the [`AzureCosmosDB/cosmosdb-agent-kit`](https://github.c
 To regenerate rules after the upstream agent-kit updates:
 
 1. Open `.cursor/prompts/generate-rules.md` in Cursor
-2. Run the saved prompt — it fetches the latest skills from the agent-kit repo and regenerates all `rules/*/RULE.md` files
+2. Run the saved prompt — it fetches the latest skills from the agent-kit repo and regenerates all `rules/*.mdc` files
 
 ## Usage Examples
 

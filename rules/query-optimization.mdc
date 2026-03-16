@@ -1,5 +1,3 @@
-<!-- Auto-generated from skills/cosmosdb-best-practices/rules/query-*.md -->
-<!-- Regenerate: run .cursor/prompts/generate-rules.md -->
 ---
 description: "Azure Cosmos DB query optimization: avoid cross-partition queries, full scans, use projections and parameterization"
 globs:

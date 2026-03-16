@@ -1,5 +1,3 @@
-<!-- Auto-generated from skills/cosmosdb-best-practices/rules/global-*.md -->
-<!-- Regenerate: run .cursor/prompts/generate-rules.md -->
 ---
 description: "Azure Cosmos DB global distribution: multi-region, consistency levels, failover, and conflict resolution"
 globs:
