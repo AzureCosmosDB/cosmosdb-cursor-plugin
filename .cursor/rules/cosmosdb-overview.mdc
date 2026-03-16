@@ -1,0 +1,50 @@
+---
+description: "Azure Cosmos DB: overview rule for data modeling, SDK patterns, query optimization, and operational best practices"
+globs:
+  - "**/*.{cs,ts,js,py,java,json}"
+alwaysApply: false
+---
+
+# Azure Cosmos DB Best Practices
+
+Use the rules in this folder for focused guidance while working with Azure Cosmos DB.
+
+## Data modeling & schema design
+
+- `data-modeling.mdc`
+
+## Partition key design
+
+- `partition-key.mdc`
+
+## Query optimization
+
+- `query-optimization.mdc`
+
+## SDK best practices
+
+- `sdk-patterns.mdc`
+
+## Indexing strategies
+
+- `indexing.mdc`
+
+## Throughput & scaling
+
+- `throughput.mdc`
+
+## Global distribution
+
+- `global-distribution.mdc`
+
+## Monitoring & diagnostics
+
+- `monitoring.mdc`
+
+## Design patterns
+
+- `design-patterns.mdc`
+
+## Vector search
+
+- `vector-search`

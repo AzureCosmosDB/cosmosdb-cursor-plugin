@@ -1,5 +1,6 @@
 {
   "name": "azure-cosmosdb",
+  "displayName": "Azure Cosmos DB",
   "version": "0.1.0",
   "description": "Access your Azure Cosmos DB accounts and perform tasks like managing databases, querying data, vector search, and schema discovery.",
   "author": {

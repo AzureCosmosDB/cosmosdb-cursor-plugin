@@ -1,5 +1,3 @@
-<!-- Auto-generated from skills/cosmosdb-best-practices/rules/index-*.md -->
-<!-- Regenerate: run .cursor/prompts/generate-rules.md -->
 ---
 description: "Azure Cosmos DB indexing strategies: composite indexes, excluded paths, index types, and spatial indexes"
 globs:
